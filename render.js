@@ -18,12 +18,16 @@ const { chromium } = require('playwright');
     }
   });
 
+  console.log('Opening:', url);
+
   await page.goto(url, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: 60000
   });
 
-  await page.waitForTimeout(5000);
+  console.log('DOM loaded');
+
+  await page.waitForTimeout(10000);
 
   console.log('TITLE:', await page.title());
   console.log('URL:', page.url());
@@ -33,5 +37,10 @@ const { chromium } = require('playwright');
     fullPage: true
   });
 
+  console.log('Screenshot saved');
+
   await browser.close();
-})();
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
