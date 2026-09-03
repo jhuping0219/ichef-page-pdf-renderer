@@ -7,8 +7,11 @@ const { chromium } = require('playwright');
     throw new Error('缺少 STORE_URL');
   }
 
+  console.log('Opening:', url);
+
   const browser = await chromium.launch({
-    headless: true
+    headless: true,
+    channel: 'chrome'
   });
 
   const page = await browser.newPage({
@@ -17,8 +20,6 @@ const { chromium } = require('playwright');
       height: 1200
     }
   });
-
-  console.log('Opening:', url);
 
   await page.goto(url, {
     waitUntil: 'domcontentloaded',
