@@ -3,6 +3,7 @@ const { chromium } = require('playwright');
 (async () => {
   const url = process.env.STORE_URL;
   const companyName = process.env.COMPANY_NAME;
+  const requestedLocale = process.env.BROWSER_LOCALE || 'zh-TW';
 
   if (!url) {
     throw new Error('缺少 STORE_URL');
@@ -12,7 +13,18 @@ const { chromium } = require('playwright');
     throw new Error('缺少 COMPANY_NAME');
   }
 
+  const locale =
+    requestedLocale === 'en-US'
+      ? 'en-US'
+      : 'zh-TW';
+
+  const acceptLanguage =
+    locale === 'en-US'
+      ? 'en-US,en;q=0.9'
+      : 'zh-TW,zh;q=0.9,en;q=0.8';
+
   console.log('Opening:', url);
+  console.log('Browser locale:', locale);
 
   const browser = await chromium.launch({
     headless: true,
@@ -20,14 +32,14 @@ const { chromium } = require('playwright');
   });
 
   const context = await browser.newContext({
-    locale: 'zh-TW',
+    locale,
     timezoneId: 'Asia/Taipei',
     viewport: {
       width: 1440,
       height: 1200
     },
     extraHTTPHeaders: {
-      'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8'
+      'Accept-Language': acceptLanguage
     }
   });
 
@@ -45,6 +57,16 @@ const { chromium } = require('playwright');
 
   console.log('TITLE:', await page.title());
   console.log('URL:', page.url());
+
+  console.log(
+    'navigator.language:',
+    await page.evaluate(() => navigator.language)
+  );
+
+  console.log(
+    'navigator.languages:',
+    await page.evaluate(() => navigator.languages)
+  );
 
   // 在整個網頁最上方加入公司名稱
   await page.evaluate((name) => {
@@ -71,7 +93,6 @@ const { chromium } = require('playwright');
     );
   }, companyName);
 
-  // 使用螢幕顯示樣式產生 PDF
   await page.emulateMedia({
     media: 'screen'
   });
