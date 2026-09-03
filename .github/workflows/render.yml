@@ -8,6 +8,11 @@ on:
         required: true
         type: string
 
+      company_name:
+        description: "公司名稱"
+        required: true
+        type: string
+
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -27,14 +32,15 @@ jobs:
       - name: Check Chrome
         run: google-chrome --version
 
-      - name: Render page
+      - name: Render PDF
         env:
           STORE_URL: ${{ inputs.store_url }}
+          COMPANY_NAME: ${{ inputs.company_name }}
         run: node render.js
 
-      - name: Upload preview
+      - name: Upload PDF
         uses: actions/upload-artifact@v4
         with:
-          name: preview
-          path: preview.png
+          name: ichef-pdf
+          path: output.pdf
           retention-days: 1
