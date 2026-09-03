@@ -19,12 +19,19 @@ const { chromium } = require('playwright');
     channel: 'chrome'
   });
 
-  const page = await browser.newPage({
+  const context = await browser.newContext({
+    locale: 'zh-TW',
+    timezoneId: 'Asia/Taipei',
     viewport: {
       width: 1440,
       height: 1200
+    },
+    extraHTTPHeaders: {
+      'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8'
     }
   });
+
+  const page = await context.newPage();
 
   await page.goto(url, {
     waitUntil: 'domcontentloaded',
@@ -33,7 +40,7 @@ const { chromium } = require('playwright');
 
   console.log('DOM loaded');
 
-  // 等待 iCHEF 頁面 JavaScript 完成主要渲染
+  // 等待 iCHEF 頁面的 JavaScript 完成主要渲染
   await page.waitForTimeout(10000);
 
   console.log('TITLE:', await page.title());
@@ -58,9 +65,13 @@ const { chromium } = require('playwright');
       font-family: Arial, "Noto Sans TC", sans-serif;
     `;
 
-    document.body.insertBefore(header, document.body.firstChild);
+    document.body.insertBefore(
+      header,
+      document.body.firstChild
+    );
   }, companyName);
 
+  // 使用螢幕顯示樣式產生 PDF
   await page.emulateMedia({
     media: 'screen'
   });
