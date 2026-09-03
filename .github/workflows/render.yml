@@ -1,0 +1,40 @@
+name: Render iCHEF Page
+
+on:
+  workflow_dispatch:
+    inputs:
+      store_url:
+        description: "iCHEF 店家網址"
+        required: true
+        type: string
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Render page
+        env:
+          STORE_URL: ${{ inputs.store_url }}
+        run: node render.js
+
+      - name: Upload preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: preview.png
+          retention-days: 1
