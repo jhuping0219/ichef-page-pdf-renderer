@@ -27,20 +27,60 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------------
+      # 1. 取得 GitHub Repo 程式
+      # -------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
+      # -------------------------------
+      # 2. 準備 Node.js
+      # -------------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm install
+      # -------------------------------
+      # 3. Cache npm 下載內容
+      # -------------------------------
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
+      # -------------------------------
+      # 4. Cache node_modules
+      #
+      # package.json 沒改時，
+      # 下一次可以直接使用上一次裝好的 Playwright
+      # -------------------------------
+      - name: Cache node_modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      # -------------------------------
+      # 5. 只有 Cache 沒命中才 npm install
+      # -------------------------------
+      - name: Install dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: npm install --prefer-offline --no-audit --no-fund
+
+      # -------------------------------
+      # 6. 確認 GitHub Runner 已有 Chrome
+      # -------------------------------
       - name: Check Chrome
         run: google-chrome --version
 
+      # -------------------------------
+      # 7. 使用 Playwright 產 PDF
+      # -------------------------------
       - name: Render PDF
         env:
           STORE_URL: ${{ inputs.store_url }}
@@ -48,6 +88,9 @@ jobs:
           BROWSER_LOCALE: ${{ inputs.browser_locale }}
         run: node render.js
 
+      # -------------------------------
+      # 8. 上傳 PDF 給 n8n 取得
+      # -------------------------------
       - name: Upload PDF
         uses: actions/upload-artifact@v4
         with:
