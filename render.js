@@ -44,10 +44,7 @@ const { chromium } = require('playwright');
 
   const page = await context.newPage();
 
-  // --------------------------------------------------
-  // 1. 開啟 iCHEF 網頁
-  // --------------------------------------------------
-
+  // 開啟 iCHEF 頁面
   await page.goto(url, {
     waitUntil: 'domcontentloaded',
     timeout: 60000
@@ -55,74 +52,33 @@ const { chromium } = require('playwright');
 
   console.log('DOM loaded');
 
-  // 保留之前測試成功的等待時間
+  // 保留原本已驗證成功的等待方式
   await page.waitForTimeout(10000);
 
-  // --------------------------------------------------
-  // 2. 嘗試等待餐廳名稱元素
-  // --------------------------------------------------
-
-  try {
-    await page.waitForSelector(
+  // 修改頁面頂部的餐廳名稱
+  const result = await page.evaluate((companyName) => {
+    const selectors = [
       '[data-testid="StoreAuthHeader-storeName"]',
-      {
-        timeout: 5000
-      }
-    );
-  } catch (error) {
-    console.log(
-      'StoreAuthHeader-storeName not found after waiting'
-    );
-  }
+      '[data-test-id="StoreAuthHeader-storeName"]',
+      'header h4',
+      'header [class*="StoreName"]'
+    ];
 
-  // --------------------------------------------------
-  // 3. 修改頂部餐廳名稱
-  //
-  // 會依序嘗試多個 selector
-  // 找不到也不會中止 PDF
-  // --------------------------------------------------
-
-  const restaurantResult = await page.evaluate(
-    (companyName) => {
-      const selectors = [
-        '[data-testid="StoreAuthHeader-storeName"]',
-        '[data-test-id="StoreAuthHeader-storeName"]',
-        'header h4',
-        'header [class*="StoreName"]'
-      ];
-
-      let element = null;
-      let usedSelector = '';
-
-      for (const selector of selectors) {
-        const found =
-          document.querySelector(selector);
-
-        if (found) {
-          const text =
-            (found.textContent || '')
-              .trim();
-
-          if (text) {
-            element = found;
-            usedSelector = selector;
-            break;
-          }
-        }
-      }
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
 
       if (!element) {
-        return {
-          updated: false,
-          selector: ''
-        };
+        continue;
       }
 
       const originalName =
-        element.textContent.trim();
+        (element.textContent || '').trim();
 
-      const suffix =
-        `（${companyName}）`;
+      if (!originalName) {
+        continue;
+      }
+
+      const suffix = `（${companyName}）`;
 
       if (!originalName.endsWith(suffix)) {
         element.textContent =
@@ -131,123 +87,41 @@ const { chromium } = require('playwright');
 
       return {
         updated: true,
-        selector: usedSelector,
-        originalName
+        selector
       };
-    },
-    companyName
-  );
+    }
 
-  if (restaurantResult.updated) {
+    return {
+      updated: false,
+      selector: ''
+    };
+  }, companyName);
+
+  if (result.updated) {
     console.log(
-      'Restaurant name updated with selector:',
-      restaurantResult.selector
+      'Restaurant name updated:',
+      result.selector
     );
   } else {
     console.log(
-      'WARNING: Restaurant name element not found. PDF will still continue.'
+      'WARNING: Restaurant name was not found.'
     );
   }
 
-  // --------------------------------------------------
-  // 4. 修正造成 PDF 大量空白的高度
-  // --------------------------------------------------
-
-  await page.evaluate(() => {
-    const selectors = [
-      'html',
-      'body',
-      '#app',
-      '#appPaper',
-      '[class*="FullViewportHeightLayoutContent"]',
-      '[data-testid="restaurantMenuPage"]',
-      '[data-test-id="restaurantMenuPage"]',
-      '[class*="RestaurantMenuPage__Wrapper"]'
-    ];
-
-    selectors.forEach((selector) => {
-      document
-        .querySelectorAll(selector)
-        .forEach((element) => {
-          element.style.setProperty(
-            'min-height',
-            '0',
-            'important'
-          );
-
-          element.style.setProperty(
-            'height',
-            'auto',
-            'important'
-          );
-
-          element.style.setProperty(
-            'max-height',
-            'none',
-            'important'
-          );
-        });
-    });
-  });
-
-  // --------------------------------------------------
-  // 5. 加入 PDF 專用 CSS
-  // --------------------------------------------------
-
-  await page.addStyleTag({
-    content: `
-      html,
-      body {
-        height: auto !important;
-        min-height: 0 !important;
-      }
-
-      #app,
-      #appPaper {
-        height: auto !important;
-        min-height: 0 !important;
-      }
-
-      [class*="FullViewportHeightLayoutContent"] {
-        height: auto !important;
-        min-height: 0 !important;
-      }
-
-      [data-testid="restaurantMenuPage"],
-      [data-test-id="restaurantMenuPage"] {
-        height: auto !important;
-        min-height: 0 !important;
-      }
-
-      [class*="RestaurantMenuPage__Wrapper"] {
-        height: auto !important;
-        min-height: 0 !important;
-      }
-    `
-  });
-
-  await page.waitForTimeout(1000);
-
-  // --------------------------------------------------
-  // 6. 使用螢幕樣式輸出 PDF
-  // --------------------------------------------------
-
+  // 使用畫面顯示樣式
   await page.emulateMedia({
     media: 'screen'
   });
 
-  // --------------------------------------------------
-  // 7. 輸出 PDF
-  // --------------------------------------------------
-
+  // 輸出 PDF
   await page.pdf({
     path: 'output.pdf',
     format: 'A4',
     printBackground: true,
     margin: {
-      top: '8mm',
+      top: '10mm',
       right: '8mm',
-      bottom: '8mm',
+      bottom: '10mm',
       left: '8mm'
     }
   });
