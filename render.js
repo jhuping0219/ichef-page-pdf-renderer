@@ -25,6 +25,7 @@ const { chromium } = require('playwright');
 
   console.log('Browser locale:', locale);
 
+  // 啟動 GitHub Runner 內建的 Chrome
   const browser = await chromium.launch({
     headless: true,
     channel: 'chrome'
@@ -33,10 +34,12 @@ const { chromium } = require('playwright');
   const context = await browser.newContext({
     locale,
     timezoneId: 'Asia/Taipei',
+
     viewport: {
       width: 1440,
       height: 1200
     },
+
     extraHTTPHeaders: {
       'Accept-Language': acceptLanguage
     }
@@ -44,7 +47,7 @@ const { chromium } = require('playwright');
 
   const page = await context.newPage();
 
-  // 開啟 iCHEF 頁面
+  // 開啟 iCHEF 線上點餐頁
   await page.goto(url, {
     waitUntil: 'domcontentloaded',
     timeout: 60000
@@ -52,10 +55,16 @@ const { chromium } = require('playwright');
 
   console.log('DOM loaded');
 
-  // 保留原本已驗證成功的等待方式
+  // 等待 iCHEF 前端 JavaScript 完成主要畫面渲染
   await page.waitForTimeout(10000);
 
-  // 修改頁面頂部的餐廳名稱
+  // 將公司名稱加入頂部餐廳名稱後方
+  //
+  // 原本：
+  // 基隆三兄弟豆花夜市攤販
+  //
+  // 產出：
+  // 基隆三兄弟豆花夜市攤販（資廚管理顧問股份有限公司）
   const result = await page.evaluate((companyName) => {
     const selectors = [
       '[data-testid="StoreAuthHeader-storeName"]',
@@ -108,16 +117,17 @@ const { chromium } = require('playwright');
     );
   }
 
-  // 使用畫面顯示樣式
+  // 使用螢幕顯示樣式輸出
   await page.emulateMedia({
     media: 'screen'
   });
 
-  // 輸出 PDF
+  // 產生 PDF
   await page.pdf({
     path: 'output.pdf',
     format: 'A4',
     printBackground: true,
+
     margin: {
       top: '10mm',
       right: '8mm',
