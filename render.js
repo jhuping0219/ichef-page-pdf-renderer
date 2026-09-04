@@ -25,10 +25,6 @@ const { chromium } = require('playwright');
 
   console.log('Browser locale:', locale);
 
-  // --------------------------------------------------
-  // 1. 啟動 Chrome
-  // --------------------------------------------------
-
   const browser = await chromium.launch({
     headless: true,
     channel: 'chrome'
@@ -49,7 +45,7 @@ const { chromium } = require('playwright');
   const page = await context.newPage();
 
   // --------------------------------------------------
-  // 2. 開啟 iCHEF 網頁
+  // 1. 開啟 iCHEF 網頁
   // --------------------------------------------------
 
   await page.goto(url, {
@@ -59,55 +55,102 @@ const { chromium } = require('playwright');
 
   console.log('DOM loaded');
 
-  // 保留之前已經測試成功的等待方式
+  // 保留之前測試成功的等待時間
   await page.waitForTimeout(10000);
+
+  // --------------------------------------------------
+  // 2. 嘗試等待餐廳名稱元素
+  // --------------------------------------------------
+
+  try {
+    await page.waitForSelector(
+      '[data-testid="StoreAuthHeader-storeName"]',
+      {
+        timeout: 5000
+      }
+    );
+  } catch (error) {
+    console.log(
+      'StoreAuthHeader-storeName not found after waiting'
+    );
+  }
 
   // --------------------------------------------------
   // 3. 修改頂部餐廳名稱
   //
-  // 原本：
-  // 基隆三兄弟豆花夜市攤販
-  //
-  // 修改：
-  // 基隆三兄弟豆花夜市攤販（公司名稱）
+  // 會依序嘗試多個 selector
+  // 找不到也不會中止 PDF
   // --------------------------------------------------
 
-  const updated = await page.evaluate((companyName) => {
-    const element = document.querySelector(
-      '[data-testid="StoreAuthHeader-storeName"]'
+  const restaurantResult = await page.evaluate(
+    (companyName) => {
+      const selectors = [
+        '[data-testid="StoreAuthHeader-storeName"]',
+        '[data-test-id="StoreAuthHeader-storeName"]',
+        'header h4',
+        'header [class*="StoreName"]'
+      ];
+
+      let element = null;
+      let usedSelector = '';
+
+      for (const selector of selectors) {
+        const found =
+          document.querySelector(selector);
+
+        if (found) {
+          const text =
+            (found.textContent || '')
+              .trim();
+
+          if (text) {
+            element = found;
+            usedSelector = selector;
+            break;
+          }
+        }
+      }
+
+      if (!element) {
+        return {
+          updated: false,
+          selector: ''
+        };
+      }
+
+      const originalName =
+        element.textContent.trim();
+
+      const suffix =
+        `（${companyName}）`;
+
+      if (!originalName.endsWith(suffix)) {
+        element.textContent =
+          `${originalName}${suffix}`;
+      }
+
+      return {
+        updated: true,
+        selector: usedSelector,
+        originalName
+      };
+    },
+    companyName
+  );
+
+  if (restaurantResult.updated) {
+    console.log(
+      'Restaurant name updated with selector:',
+      restaurantResult.selector
     );
-
-    if (!element) {
-      return false;
-    }
-
-    const originalName =
-      element.textContent.trim();
-
-    const suffix =
-      `（${companyName}）`;
-
-    if (!originalName.endsWith(suffix)) {
-      element.textContent =
-        `${originalName}${suffix}`;
-    }
-
-    return true;
-  }, companyName);
-
-  if (!updated) {
-    throw new Error(
-      '找不到餐廳名稱元素：StoreAuthHeader-storeName'
+  } else {
+    console.log(
+      'WARNING: Restaurant name element not found. PDF will still continue.'
     );
   }
 
-  console.log('Restaurant name updated');
-
   // --------------------------------------------------
-  // 4. 修正 iCHEF 頁面造成 PDF 大量空白的高度設定
-  //
-  // 不再掃描所有 div。
-  // 只處理我們已經確認存在的主要版型容器。
+  // 4. 修正造成 PDF 大量空白的高度
   // --------------------------------------------------
 
   await page.evaluate(() => {
@@ -118,6 +161,7 @@ const { chromium } = require('playwright');
       '#appPaper',
       '[class*="FullViewportHeightLayoutContent"]',
       '[data-testid="restaurantMenuPage"]',
+      '[data-test-id="restaurantMenuPage"]',
       '[class*="RestaurantMenuPage__Wrapper"]'
     ];
 
@@ -169,7 +213,8 @@ const { chromium } = require('playwright');
         min-height: 0 !important;
       }
 
-      [data-testid="restaurantMenuPage"] {
+      [data-testid="restaurantMenuPage"],
+      [data-test-id="restaurantMenuPage"] {
         height: auto !important;
         min-height: 0 !important;
       }
@@ -184,7 +229,7 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(1000);
 
   // --------------------------------------------------
-  // 6. 使用畫面上的 CSS 樣式輸出
+  // 6. 使用螢幕樣式輸出 PDF
   // --------------------------------------------------
 
   await page.emulateMedia({
@@ -199,7 +244,6 @@ const { chromium } = require('playwright');
     path: 'output.pdf',
     format: 'A4',
     printBackground: true,
-
     margin: {
       top: '8mm',
       right: '8mm',
